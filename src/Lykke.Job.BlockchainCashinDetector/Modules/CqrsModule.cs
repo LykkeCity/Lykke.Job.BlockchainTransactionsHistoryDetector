@@ -11,7 +11,6 @@ using Lykke.Job.BlockchainTransactionsHistoryDetector.Core;
 using Lykke.Job.BlockchainTransactionsHistoryDetector.Settings.JobSettings;
 using Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.CommandHandlers;
 using Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Commands;
-using Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Events;
 using Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Sagas;
 using Lykke.Job.BlockchainOperationsExecutor.Contract;
 using Lykke.Messaging;
@@ -20,8 +19,6 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Modules
 {
     public class CqrsModule : Module
     {
-        private static readonly string Self = BlockchainCashinDetectorBoundedContext.Name;
-
         private readonly CqrsSettings _settings;
         private readonly ChaosSettings _chaosSettings;
         private readonly ILog _log;
@@ -58,13 +55,11 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Modules
                 new RabbitMqTransportFactory());
 
             // Sagas
-            builder.RegisterType<CashinSaga>();
+            builder.RegisterType<WalletMonitorCreationSaga>();
 
             // Command handlers
-            builder.RegisterType<StartCashinCommandsHandler>();
-            builder.RegisterType<EnrollToMatchingEngineCommandsHandler>();
-            builder.RegisterType<DetectDepositBalanceCommandHandler>();
-            builder.RegisterType<RemoveMatchingEngineDeduplicationLockCommandsHandler>();
+            builder.RegisterType<StartAddressObservationCommandHandler>();
+            builder.RegisterType<MonitoringTransactionHistoryCommandHandler>();
 
             builder.Register(ctx => CreateEngine(ctx, messagingEngine))
                 .As<ICqrsEngine>()
@@ -90,70 +85,26 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Modules
                     "messagepack", 
                     environment: "lykke")),
 
-                Register.BoundedContext(Self)
+                Register.BoundedContext(BoundedContext.BlockChainTransactionHistoryDetectorContext)
                     .FailedCommandRetryDelay(defaultRetryDelay)
-
-                    .ListeningCommands(typeof(DetectDepositBalanceCommand))
+                    .ListeningCommands(typeof(MonitoringTransactionHistoryCommand))
                     .On(defaultRoute)
                     .WithLoopback()
-                    .WithCommandsHandler<DetectDepositBalanceCommandHandler>()
-                    .PublishingEvents(typeof(DepositBalanceDetectedEvent))
-                    .With(defaultPipeline)
-                    
-                    .ListeningCommands(typeof(StartCashinCommand))
+                    .WithCommandsHandler<MonitoringTransactionHistoryCommandHandler>()
+                    .ListeningCommands(typeof(StartAddressObservationCommand))
                     .On(defaultRoute)
-                    .WithCommandsHandler<StartCashinCommandsHandler>()
-                    .PublishingEvents(typeof(CashinStartedEvent))
-                    .With(defaultPipeline)
-                    
-                    .ListeningCommands(typeof(EnrollToMatchingEngineCommand))
-                    .On(defaultRoute)
-                    .WithCommandsHandler<EnrollToMatchingEngineCommandsHandler>()
-                    .PublishingEvents(typeof(CashinEnrolledToMatchingEngineEvent))
-                    .With(defaultPipeline)
-
-                    .ListeningCommands(typeof(RemoveMatchingEngineDeduplicationLockCommand))
-                    .On(defaultRoute)
-                    .WithCommandsHandler<RemoveMatchingEngineDeduplicationLockCommandsHandler>()
-                    .PublishingEvents(typeof(MatchingEngineDeduplicationLockRemovedEvent))
-                    .With(defaultPipeline)
-
+                    .WithCommandsHandler<StartAddressObservationCommandHandler>()
                     .ProcessingOptions(defaultRoute).MultiThreaded(8).QueueCapacity(1024),
 
-                Register.Saga<CashinSaga>($"{Self}.saga")
-                    .ListeningEvents(typeof(DepositBalanceDetectedEvent))
-                    .From(Self)
-                    .On(defaultRoute)
-                    .PublishingCommands(typeof(StartCashinCommand))
-                    .To(Self)
-                    .With(defaultPipeline)
-
-                    .ListeningEvents(typeof(CashinStartedEvent))
-                    .From(Self)
-                    .On(defaultRoute)
-                    .PublishingCommands(typeof(EnrollToMatchingEngineCommand))
-                    .To(Self)
-                    .With(defaultPipeline)
-
-                    .ListeningEvents(typeof(CashinEnrolledToMatchingEngineEvent))
-                    .From(Self)
-                    .On(defaultRoute)
-                    .PublishingCommands(typeof(BlockchainOperationsExecutor.Contract.Commands.StartOperationExecutionCommand))
-                    .To(BlockchainOperationsExecutorBoundedContext.Name)
-                    .With(defaultPipeline)
-
+                Register.Saga<WalletMonitorCreationSaga>($"{BoundedContext.BlockChainTransactionHistoryDetectorContext}.saga")
                     .ListeningEvents(
-                        typeof(BlockchainOperationsExecutor.Contract.Events.OperationExecutionCompletedEvent),
-                        typeof(BlockchainOperationsExecutor.Contract.Events.OperationExecutionFailedEvent))
-                    .From(BlockchainOperationsExecutorBoundedContext.Name)
+                        typeof(Lykke.Service.BlockchainWallets.Contract.Events.WalletCreatedEvent),
+                        typeof(Lykke.Service.BlockchainWallets.Contract.Events.WalletDeletedEvent))
+                    .From(Lykke.Service.BlockchainWallets.Contract.BlockchainWalletsBoundedContext.Name)
                     .On(defaultRoute)
-                    .PublishingCommands(typeof(RemoveMatchingEngineDeduplicationLockCommand))
-                    .To(Self)
-                    .With(defaultPipeline)
-
-                    .ListeningEvents(typeof(MatchingEngineDeduplicationLockRemovedEvent))
-                    .From(Self)
-                    .On(defaultRoute));
+                    .PublishingCommands(typeof(StartAddressObservationCommand))
+                    .To(BoundedContext.BlockChainTransactionHistoryDetectorContext)
+                    .With(defaultPipeline));
         }
     }
 }

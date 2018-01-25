@@ -4,7 +4,7 @@ using Lykke.SettingsReader.Attributes;
 namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Settings.JobSettings
 {
     [UsedImplicitly]
-    public class BlockchainCashinDetectorSettings
+    public class BlockchainTransactionsHistoryDetectorSettings
     {
         [UsedImplicitly(ImplicitUseKindFlags.Assign)]
         public DbSettings Db { get; set; }

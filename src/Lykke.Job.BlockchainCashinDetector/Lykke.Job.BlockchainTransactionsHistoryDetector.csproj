@@ -58,4 +58,8 @@
     <ProjectReference Include="..\Lykke.Job.BlockchainCashinDetector.Core\Lykke.Job.BlockchainTransactionsHistoryDetector.Core.csproj" />
     <ProjectReference Include="..\Lykke.Job.BlockchainCashinDetector.Services\Lykke.Job.BlockchainTransactionsHistoryDetector.Services.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Workflow\Events\" />
+  </ItemGroup>
 </Project>

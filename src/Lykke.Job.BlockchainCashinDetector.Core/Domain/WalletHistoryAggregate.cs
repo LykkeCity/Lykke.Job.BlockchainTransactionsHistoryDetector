@@ -37,7 +37,6 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Core.Domain
     public class WalletHistoryAggregate
     {
         public DateTime CreationMoment { get; }
-        public Guid AggregateId { get; }
         public string BlockchainType { get; }
         public string WalletAddress { get; }
         public string AssetId { get; }
@@ -51,7 +50,6 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Core.Domain
             WalletAddressType walletAddressType)
         {
             CreationMoment = DateTime.UtcNow;
-            AggregateId = Guid.NewGuid();
             BlockchainType = blockchainType;
             WalletAddress = walletAddress;
             WalletAddressType = walletAddressType;
@@ -60,7 +58,6 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Core.Domain
         }
 
         private WalletHistoryAggregate(
-            Guid aggregateId,
             string blockchainType,
             string walletAddress,
             string assetId,
@@ -68,12 +65,16 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Core.Domain
             WalletHistoryState walletHistoryState)
         {
             CreationMoment = DateTime.UtcNow;
-            AggregateId = aggregateId;
             BlockchainType = blockchainType;
             WalletAddress = walletAddress;
             WalletAddressType = walletAddressType;
             WalletHistoryState = walletHistoryState;
             AssetId = assetId;
+        }
+
+        public static WalletHistoryAggregate Restore(string assetId, string blockchainType, string walletAddress, WalletAddressType walletAddressType, WalletHistoryState walletHistoryState)
+        {
+            return new WalletHistoryAggregate(blockchainType, walletAddress, assetId, walletAddressType, walletHistoryState);
         }
 
         public static WalletHistoryAggregate CreateNew(
@@ -86,13 +87,12 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Core.Domain
         }
 
         public static WalletHistoryAggregate StopObservation(
-            Guid aggregatedId,
             string blockchainType,
             string walletAddress,
             string assetId,
             WalletAddressType walletAddressType)
         {
-            return new WalletHistoryAggregate(aggregatedId, blockchainType, walletAddress, assetId, walletAddressType, WalletHistoryState.Stopped);
+            return new WalletHistoryAggregate(blockchainType, walletAddress, assetId, walletAddressType, WalletHistoryState.Stopped);
         }
     }
 }

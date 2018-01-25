@@ -34,27 +34,28 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Core.Domain
         }
     */
 
-    public class LastTransactionAggregate
+    public class LastTransaction
     {
         public string BlockchainType { get; }
         public string Address { get; }
-        public string BlockchainAssetId { get; }
-        public string TransactionHash { get; private set; }
+        public string TransactionHash { get; }
+        public WalletAddressType WalletAddressType { get; }
 
-        private LastTransactionAggregate(
+        private LastTransaction(
             string blockchainType,
             string address,
-            string blockchainAssetId,
-            string transactionHash)
+            string transactionHash,
+            WalletAddressType walletAddressType)
         {
             BlockchainType = blockchainType;
             Address = address;
-            BlockchainAssetId = blockchainAssetId;
+            TransactionHash = transactionHash;
+            WalletAddressType = walletAddressType;
         }
 
-        public static LastTransactionAggregate CreateLatest(string blockchainType, string address, string blockchainAssetId, string blockchainTransactionHash)
+        public static LastTransaction CreateLatest(string blockchainType, string address, string blockchainTransactionHash, WalletAddressType walletAddressType)
         {
-            return new LastTransactionAggregate(blockchainType, address, blockchainAssetId, blockchainTransactionHash);
+            return new LastTransaction(blockchainType, address, blockchainTransactionHash, walletAddressType);
         }
     }
 }

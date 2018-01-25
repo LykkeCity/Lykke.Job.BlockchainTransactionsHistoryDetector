@@ -15,13 +15,13 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Modules
 {
     public class BlockchainsModule : Module
     {
-        private readonly BlockchainCashinDetectorSettings _settings;
+        private readonly BlockchainTransactionsHistoryDetectorSettings _settings;
         private readonly BlockchainsIntegrationSettings _blockchainsIntegrationSettings;
         private readonly BlockchainWalletsServiceClientSettings _walletsServiceSettings;
         private readonly ILog _log;
 
         public BlockchainsModule(
-            BlockchainCashinDetectorSettings settings,
+            BlockchainTransactionsHistoryDetectorSettings settings,
             BlockchainsIntegrationSettings blockchainsIntegrationSettings,
             BlockchainWalletsServiceClientSettings walletsServiceSettings,
             ILog log)
@@ -57,7 +57,8 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Modules
                     .WithParameter(TypedParameter.From(blockchain.ApiUrl))
                     .SingleInstance();
 
-                builder.RegisterType<DepositWalletsBalanceProcessingPeriodicalHandler>()
+
+                builder.RegisterType<TransactionHistoryProcessingPeriodicalHandler>()
                     .As<IStartable>()
                     .AutoActivate()
                     .SingleInstance()

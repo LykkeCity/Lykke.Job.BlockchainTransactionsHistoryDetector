@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Sagas
 {
-    public class WalletCreationSaga
+    public class WalletMonitorCreationSaga
     {
         /// <summary>
         /// -> DepositWalletsBalanceProcessingPeriodicalHandler : DetectDepositBalanceCommand
@@ -32,9 +32,9 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Sagas
         private readonly ILog _log;
         private readonly IWalletHistoryRepository _walletHistoryRepository;
 
-        public WalletCreationSaga(ILog log, IWalletHistoryRepository walletHistoryRepository)
+        public WalletMonitorCreationSaga(ILog log, IWalletHistoryRepository walletHistoryRepository)
         {
-            _log = log.CreateComponentScope(nameof(WalletCreationSaga));
+            _log = log.CreateComponentScope(nameof(WalletMonitorCreationSaga));
             _walletHistoryRepository = walletHistoryRepository;
         }
 
@@ -46,6 +46,11 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Sagas
 #endif
             try
             {
+                var old = await _walletHistoryRepository.TryGetAsync(evt.IntegrationLayerId, evt.Address, evt.AssetId);
+                if (old != null)
+                {
+                    return;
+                }
                 var aggregate = await _walletHistoryRepository.GetOrAddAsync(
                     evt.IntegrationLayerId,
                     evt.Address,
@@ -55,17 +60,17 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Sagas
 
                 if (aggregate.WalletHistoryState == WalletHistoryState.Started)
                 {
-                    sender.SendCommand(new MonitoringTransactionHistoryCommand
+                    sender.SendCommand(new StartAddressObservationCommand
                     {
                         BlockchainType = aggregate.BlockchainType,
                         WalletAddress = aggregate.WalletAddress,
                         WalletAddressType = aggregate.WalletAddressType
-                    }, Context);
+                    }, BoundedContext.BlockChainTransactionHistoryDetectorContext);
                 }
             }
             catch (Exception ex)
             {
-                _log.WriteError(nameof(WalletCreationSaga), evt, ex);
+                _log.WriteError(nameof(WalletMonitorCreationSaga), evt, ex);
                 throw;
             }
         }
@@ -92,12 +97,11 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Sagas
                     aggregate.BlockchainType,
                     aggregate.WalletAddress,
                     aggregate.AssetId,
-                    WalletAddressType.Both));
-
+                    aggregate.WalletAddressType));
             }
             catch (Exception ex)
             {
-                _log.WriteError(nameof(WalletCreationSaga), evt, ex);
+                _log.WriteError(nameof(WalletMonitorCreationSaga), evt, ex);
                 throw;
             }
         }

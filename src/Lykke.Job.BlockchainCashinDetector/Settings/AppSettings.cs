@@ -2,7 +2,6 @@
 using Lykke.Job.BlockchainTransactionsHistoryDetector.Settings.Assets;
 using Lykke.Job.BlockchainTransactionsHistoryDetector.Settings.Blockchain;
 using Lykke.Job.BlockchainTransactionsHistoryDetector.Settings.JobSettings;
-using Lykke.Job.BlockchainTransactionsHistoryDetector.Settings.MeSettings;
 using Lykke.Job.BlockchainTransactionsHistoryDetector.Settings.SlackNotifications;
 
 namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Settings
@@ -11,7 +10,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Settings
     public class AppSettings
     {
         [UsedImplicitly(ImplicitUseKindFlags.Assign)]
-        public BlockchainCashinDetectorSettings BlockchainCashinDetectorJob { get; set; }
+        public BlockchainTransactionsHistoryDetectorSettings BlockchainTransactionsHistoryDetectorSettings { get; set; }
 
         [UsedImplicitly(ImplicitUseKindFlags.Assign)]
         public SlackNotificationsSettings SlackNotifications { get; set; }
@@ -21,8 +20,5 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Settings
 
         [UsedImplicitly(ImplicitUseKindFlags.Assign)]
         public AssetsSettings Assets { get; set; }
-
-        [UsedImplicitly(ImplicitUseKindFlags.Assign)]
-        public BlockchainWalletsServiceClientSettings BlockchainWalletsServiceClient { get; set; }
     }
 }
