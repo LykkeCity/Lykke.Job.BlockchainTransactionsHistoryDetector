@@ -52,7 +52,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector
 
                 services.AddSwaggerGen(options =>
                 {
-                    options.DefaultLykkeConfiguration("v1", "BlockchainCashinDetector API");
+                    options.DefaultLykkeConfiguration("v1", "BlockchainTransactionsHistoryDetector API");
                 });
 
                 var builder = new ContainerBuilder();
@@ -63,20 +63,18 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector
                 builder.Populate(services);
                 
                 builder.RegisterModule(new JobModule(
-                    appSettings.CurrentValue.MatchingEngineClient,
                     appSettings.CurrentValue.Assets,
                     Log));
                 builder.RegisterModule(new RepositoriesModule(
-                    appSettings.Nested(x => x.BlockchainCashinDetectorJob.Db),
+                    appSettings.Nested(x => x.BlockchainTransactionsHistoryDetectorSettings.Db),
                     Log));
                 builder.RegisterModule(new BlockchainsModule(
-                    appSettings.CurrentValue.BlockchainCashinDetectorJob,
+                    appSettings.CurrentValue.BlockchainTransactionsHistoryDetectorSettings,
                     appSettings.CurrentValue.BlockchainsIntegration,
-                    appSettings.CurrentValue.BlockchainWalletsServiceClient,
                     Log));
                 builder.RegisterModule(new CqrsModule(
-                    appSettings.CurrentValue.BlockchainCashinDetectorJob.Cqrs,
-                    appSettings.CurrentValue.BlockchainCashinDetectorJob.ChaosKitty,
+                    appSettings.CurrentValue.BlockchainTransactionsHistoryDetectorSettings.Cqrs,
+                    appSettings.CurrentValue.BlockchainTransactionsHistoryDetectorSettings.ChaosKitty,
                     Log));
 
                 ApplicationContainer = builder.Build();
@@ -100,7 +98,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector
                     app.UseDeveloperExceptionPage();
                 }
 
-                app.UseLykkeMiddleware("BlockchainCashinDetector", ex => ErrorResponse.Create("Technical problem"));
+                app.UseLykkeMiddleware("BlockchainTransactionsHistoryDetector", ex => ErrorResponse.Create("Technical problem"));
 
                 app.UseMvc();
                 app.UseSwagger(c =>
@@ -190,7 +188,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector
 
             aggregateLogger.AddLog(consoleLogger);
 
-            var dbLogConnectionStringManager = settings.Nested(x => x.BlockchainCashinDetectorJob.Db.LogsConnString);
+            var dbLogConnectionStringManager = settings.Nested(x => x.BlockchainTransactionsHistoryDetectorSettings.Db.LogsConnString);
             var dbLogConnectionString = dbLogConnectionStringManager.CurrentValue;
 
             if (string.IsNullOrEmpty(dbLogConnectionString))
@@ -203,7 +201,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector
                 throw new InvalidOperationException($"LogsConnString {dbLogConnectionString} is not filled in settings");
 
             var persistenceManager = new LykkeLogToAzureStoragePersistenceManager(
-                AzureTableStorage<LogEntity>.Create(dbLogConnectionStringManager, "BlockchainCashinDetectorLog", consoleLogger),
+                AzureTableStorage<LogEntity>.Create(dbLogConnectionStringManager, "BlockchainTransactionsHistoryDetectorLog", consoleLogger),
                 consoleLogger);
 
             // Creating slack notification service, which logs own azure queue processing messages to aggregate log

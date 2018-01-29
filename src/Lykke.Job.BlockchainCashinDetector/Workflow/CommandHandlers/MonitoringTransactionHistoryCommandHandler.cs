@@ -72,7 +72,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.CommandHandle
                             (await _lastTransactionRepository.TryGetAsync(command.BlockchainType, command.WalletAddress, WalletAddressType.From))?.TransactionHash 
                             : cachedLastFromHash;
                         historicalTransactionFrom = await client.GetHistoryOfOutgoingTransactionsAsync(command.WalletAddress, 
-                            cachedLastFromHash,
+                            cachedLastFromHash ?? "",
                             _batchSize,
                             GetAssetAccuracyFunc(assetDictionary));
 
@@ -85,7 +85,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.CommandHandle
                             (await _lastTransactionRepository.TryGetAsync(command.BlockchainType, command.WalletAddress, WalletAddressType.To))?.TransactionHash
                             : cachedLastToHash;
                         historicalTransactionTo = await client.GetHistoryOfIncomingTransactionsAsync(command.WalletAddress,
-                            cachedLastToHash, 
+                            cachedLastToHash ?? "", 
                             _batchSize,
                             GetAssetAccuracyFunc(assetDictionary));
 
@@ -101,7 +101,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.CommandHandle
                     if (historicalTransactionFrom != null && historicalTransactionFrom.Count() != 0)
                     {
                         var lastTransactionInBatch = historicalTransactionFrom.Last();
-                        await _lastTransactionRepository.SaveAsync(LastTransaction.CreateLatest(command.BlockchainType,
+                        await _lastTransactionRepository.SaveAsync(LastTransaction.Create(command.BlockchainType,
                             command.WalletAddress, 
                             lastTransactionInBatch.Hash,
                             WalletAddressType.From));
@@ -110,7 +110,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.CommandHandle
                     if (historicalTransactionTo != null && historicalTransactionTo.Count() != 0)
                     {
                         var lastTransactionInBatch = historicalTransactionTo.Last();
-                        await _lastTransactionRepository.SaveAsync(LastTransaction.CreateLatest(command.BlockchainType,
+                        await _lastTransactionRepository.SaveAsync(LastTransaction.Create(command.BlockchainType,
                             command.WalletAddress,
                             lastTransactionInBatch.Hash,
                             WalletAddressType.To));

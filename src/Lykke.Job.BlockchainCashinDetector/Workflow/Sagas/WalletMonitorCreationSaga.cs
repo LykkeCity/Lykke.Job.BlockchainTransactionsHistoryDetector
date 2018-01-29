@@ -14,19 +14,6 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Sagas
 {
     public class WalletMonitorCreationSaga
     {
-        /// <summary>
-        /// -> DepositWalletsBalanceProcessingPeriodicalHandler : DetectDepositBalanceCommand
-        /// -> DepositBalanceDetectedEvent
-        ///     -> StartCashinCommand
-        /// -> CashinStartedEvent
-        ///     -> EnrollToMatchingEngineCommand
-        /// -> CashinEnrolledToMatchingEngineEvent 
-        ///     -> BlockchainOperationsExecutor : StartOperationCommand
-        /// -> BlockchainOperationsExecutor : OperationCompleted | OperationFailed
-        ///     -> RemoveMatchingEngineDeduplicationLockCommand
-        /// -> MatchingEngineDeduplicationLockRemovedEvent
-        /// </summary>
-
         private static readonly string Context = Lykke.Service.BlockchainWallets.Contract.BlockchainWalletsBoundedContext.Name;
 
         private readonly ILog _log;
@@ -56,7 +43,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Sagas
                     evt.Address,
                     () => WalletHistoryAggregate.CreateNew(evt.IntegrationLayerId, evt.Address, evt.AssetId, WalletAddressType.To));
 
-                ChaosKitty.Meow(aggregate.AggregateId);
+                ChaosKitty.Meow(aggregate);
 
                 if (aggregate.WalletHistoryState == WalletHistoryState.Started)
                 {
@@ -90,10 +77,9 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Sagas
                     return;
                 }
 
-                ChaosKitty.Meow(aggregate.AggregateId);
+                ChaosKitty.Meow(aggregate);
 
                 await _walletHistoryRepository.SaveAsync(WalletHistoryAggregate.StopObservation(
-                    aggregate.AggregateId, 
                     aggregate.BlockchainType,
                     aggregate.WalletAddress,
                     aggregate.AssetId,

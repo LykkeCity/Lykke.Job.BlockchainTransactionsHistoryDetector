@@ -5,6 +5,7 @@ using Lykke.Job.BlockchainTransactionsHistoryDetector.Core.Domain;
 using Microsoft.WindowsAzure.Storage.Table;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -26,9 +27,17 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.AzureRepositories
 
         public async Task<(IEnumerable<WalletHistoryAggregate>, string continuationToken)> EnumerateWalletsAsync(string blockchainType, int take, string continuationToken = null)
         {
-            PagingInfo pagingInfo = new PagingInfo() { };
+            var newQuery = new TableQuery<WalletHistoryEntity>()
+            {
+                FilterString = TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, WalletHistoryEntity.GetPartitionKey(blockchainType)),
+                TakeCount = take
+            };
 
-            var result = await _table.GetDataWithContinuationTokenAsync(TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, blockchainType), null);
+            var (collection, newToken) = await
+                _table.GetDataWithContinuationTokenAsync(newQuery, continuationToken);
+            var mappedCollection = collection.Select(x => WalletHistoryEntity.ToDomain(x));
+
+            return (mappedCollection, newToken);
         }
 
         public async Task<WalletHistoryAggregate> GetOrAddAsync(string blockchainType, string walletAddress, Func<WalletHistoryAggregate> newAggregateFactory)
@@ -38,9 +47,9 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.AzureRepositories
             if (walletHistory == null)
             {
                 var newAggegate = newAggregateFactory();
-                var entity = WalletHistoryEntity.FromDomain(newAggegate);
+                walletHistory = WalletHistoryEntity.FromDomain(newAggegate);
 
-                await _table.InsertOrReplaceAsync(entity);
+                await _table.InsertOrReplaceAsync(walletHistory);
             }
 
             return WalletHistoryEntity.ToDomain(walletHistory);
@@ -53,9 +62,14 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.AzureRepositories
             await _table.InsertOrReplaceAsync(entity);
         }
 
-        public Task<WalletHistoryAggregate> TryGetAsync(string integrationLayerId, string address, string assetId)
+        public async Task<WalletHistoryAggregate> TryGetAsync(string integrationLayerId, string address, string assetId)
         {
-            throw new NotImplementedException();
+            var walletHistory = await _table.GetDataAsync(WalletHistoryEntity.GetPartitionKey(integrationLayerId), WalletHistoryEntity.GetRowKey(address));
+
+            if (walletHistory == null)
+                return null;
+
+            return WalletHistoryEntity.ToDomain(walletHistory);
         }
     }
 }

@@ -7,18 +7,16 @@ using System.Text;
 
 namespace Lykke.Job.BlockchainTransactionsHistoryDetector.AzureRepositories.Entities
 {
-    public class WalletHistoryEntity : AzureTableEntity
+    public class LastTransactionEntity : AzureTableEntity
     {
         #region Fields
 
         // ReSharper disable MemberCanBePrivate.Global
 
-        public DateTime CreationMoment { get; set; }
         public string BlockchainType { get; set; }
-        public string WalletAddress { get; set; }
-        public string AssetId { get; set; }
+        public string Address { get; set; }
+        public string TransactionHash { get; set; }
         public WalletAddressType WalletAddressType { get; set; }
-        public WalletHistoryState WalletHistoryState { get; set; }
 
         // ReSharper restore MemberCanBePrivate.Global
 
@@ -40,28 +38,22 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.AzureRepositories.Enti
 
         #region Conversion
 
-        public static WalletHistoryEntity FromDomain(WalletHistoryAggregate aggregate)
+        public static LastTransactionEntity FromDomain(LastTransaction aggregate)
         {
-            return new WalletHistoryEntity
+            return new LastTransactionEntity
             {
                 PartitionKey = GetPartitionKey(aggregate.BlockchainType),
-                RowKey = GetRowKey(aggregate.WalletAddress),
-                AssetId = aggregate.AssetId,
-                WalletAddress = aggregate.WalletAddress,
+                RowKey = GetRowKey(aggregate.Address),
+                Address = aggregate.Address,
                 BlockchainType = aggregate.BlockchainType,
-                CreationMoment = aggregate.CreationMoment,
-                WalletAddressType = aggregate.WalletAddressType,
-                WalletHistoryState = aggregate.WalletHistoryState
+                TransactionHash = aggregate.TransactionHash,
+                WalletAddressType = aggregate.WalletAddressType
             };
         }
 
-        public static WalletHistoryAggregate ToDomain(WalletHistoryEntity entity)
+        public static LastTransaction ToDomain(LastTransactionEntity entity)
         {
-            return WalletHistoryAggregate.Restore(entity.AssetId, 
-                entity.BlockchainType, 
-                entity.WalletAddress, 
-                entity.WalletAddressType, 
-                entity.WalletHistoryState);
+            return LastTransaction.Create(entity.BlockchainType, entity.Address, entity.TransactionHash, entity.WalletAddressType);
         }
 
         #endregion

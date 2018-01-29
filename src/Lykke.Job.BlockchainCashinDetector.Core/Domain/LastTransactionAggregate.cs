@@ -53,7 +53,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Core.Domain
             WalletAddressType = walletAddressType;
         }
 
-        public static LastTransaction CreateLatest(string blockchainType, string address, string blockchainTransactionHash, WalletAddressType walletAddressType)
+        public static LastTransaction Create(string blockchainType, string address, string blockchainTransactionHash, WalletAddressType walletAddressType)
         {
             return new LastTransaction(blockchainType, address, blockchainTransactionHash, walletAddressType);
         }

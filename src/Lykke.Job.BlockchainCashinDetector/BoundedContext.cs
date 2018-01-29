@@ -6,7 +6,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector
 {
     public static class BoundedContext
     {
-        public const string BlockChainTransactionHistoryDetectorContext = "";
-        public const string BlockChainTransactionHistoryConsumerContext = "";
+        public const string BlockChainTransactionHistoryDetectorContext = "bcn-integration.transaction-hisstory";
+        public const string BlockChainTransactionHistoryConsumerContext = "bcn-integration.transaction-hisstory";
     }
 }

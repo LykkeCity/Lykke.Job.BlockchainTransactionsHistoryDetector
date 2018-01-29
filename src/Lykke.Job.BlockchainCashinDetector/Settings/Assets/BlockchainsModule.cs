@@ -17,18 +17,15 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Modules
     {
         private readonly BlockchainTransactionsHistoryDetectorSettings _settings;
         private readonly BlockchainsIntegrationSettings _blockchainsIntegrationSettings;
-        private readonly BlockchainWalletsServiceClientSettings _walletsServiceSettings;
         private readonly ILog _log;
 
         public BlockchainsModule(
             BlockchainTransactionsHistoryDetectorSettings settings,
             BlockchainsIntegrationSettings blockchainsIntegrationSettings,
-            BlockchainWalletsServiceClientSettings walletsServiceSettings,
             ILog log)
         {
             _settings = settings;
             _blockchainsIntegrationSettings = blockchainsIntegrationSettings;
-            _walletsServiceSettings = walletsServiceSettings;
             _log = log;
         }
 
@@ -42,11 +39,6 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Modules
             builder.RegisterType<BlockchainApiClientProvider>()
                 .As<IBlockchainApiClientProvider>();
 
-            builder.RegisterType<BlockchainWalletsClient>()
-                .As<IBlockchainWalletsClient>()
-                .WithParameter(TypedParameter.From(_walletsServiceSettings.ServiceUrl))
-                .SingleInstance();
-
             foreach (var blockchain in _blockchainsIntegrationSettings.Blockchains.Where(b => !b.IsDisabled))
             {
                 _log.WriteInfo("Blockchains registration", "", 
@@ -58,13 +50,13 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Modules
                     .SingleInstance();
 
 
-                builder.RegisterType<TransactionHistoryProcessingPeriodicalHandler>()
-                    .As<IStartable>()
-                    .AutoActivate()
-                    .SingleInstance()
-                    .WithParameter(TypedParameter.From(_settings.Monitoring.Period))
-                    .WithParameter(TypedParameter.From(_settings.Requests.BatchSize))
-                    .WithParameter(TypedParameter.From(blockchain.Type));
+                //builder.RegisterType<TransactionHistoryProcessingPeriodicalHandler>()
+                //    .As<IStartable>()
+                //    .AutoActivate()
+                //    .SingleInstance()
+                //    .WithParameter(TypedParameter.From(_settings.Monitoring.Period))
+                //    .WithParameter(TypedParameter.From(_settings.Requests.BatchSize))
+                //    .WithParameter(TypedParameter.From(blockchain.Type));
             }
         }
     }
