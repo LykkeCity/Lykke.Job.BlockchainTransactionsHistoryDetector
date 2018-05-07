@@ -112,7 +112,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
                         x => DetectNewTransactionsForWalletAsync(x, cancellationToken)
                     ));
 
-                } while (continuationToken != null || !cancellationToken.IsCancellationRequested);
+                } while (continuationToken != null && !cancellationToken.IsCancellationRequested);
 
                 await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken);
 
@@ -168,7 +168,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
 
                         taskCompleted = transactions.Count == 0;
 
-                    } while (!taskCompleted || !cancellationToken.IsCancellationRequested);
+                    } while (!taskCompleted && !cancellationToken.IsCancellationRequested);
 
                     if (wallet.LatestProcessedHash != afterHash)
                     {
