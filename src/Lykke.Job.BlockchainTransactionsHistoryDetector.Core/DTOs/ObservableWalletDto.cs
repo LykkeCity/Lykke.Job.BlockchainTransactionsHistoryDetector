@@ -7,5 +7,7 @@
         public string LatestProcessedHash { get; set; }
 
         public string WalletAddress { get; set; }
+
+        public string WalletAssetId { get; set; }
     }
 }

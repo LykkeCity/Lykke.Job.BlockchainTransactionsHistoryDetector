@@ -21,14 +21,15 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
     public class NewTransactionDetectionProcess : IProcess
     {
         private readonly OnDemandDataCache<BlockchainAsset> _assetsCache;
-        private readonly IDictionary<string, IBlockchainApiClient> _blockchainApiClients;
+        private readonly IDictionary<string, BlockchainApiClient> _blockchainApiClients;
+        private readonly string[] _enabledBlockchainTypes;
         private readonly IObservableWalletsRepository _observableWalletsRepository;
         private readonly ILog _log;
-
-
+        
         private CancellationTokenSource _cancellationTokenSource;
         private IEventPublisher _eventPublisher;
         private Task _task;
+
 
         public NewTransactionDetectionProcess(
             BlockchainsIntegrationSettings blockchainsIntegrationSettings,
@@ -37,6 +38,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
         {
             _assetsCache = new OnDemandDataCache<BlockchainAsset>();
             _blockchainApiClients = CreateBlockchainApiClients(blockchainsIntegrationSettings, log);
+            _enabledBlockchainTypes = GetEnabledBlockchainTypes(blockchainsIntegrationSettings);
             _observableWalletsRepository = observableWalletsRepository;
             _log = log;
         }
@@ -74,15 +76,21 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
             }, cancellationToken);
         }
 
-        private static IDictionary<string, IBlockchainApiClient> CreateBlockchainApiClients(BlockchainsIntegrationSettings settings, ILog log)
+        private static IDictionary<string, BlockchainApiClient> CreateBlockchainApiClients(BlockchainsIntegrationSettings settings, ILog log)
+        {
+            return settings.Blockchains.ToDictionary
+            (
+                x => x.Type,
+                x => new BlockchainApiClient(log, x.ApiUrl)
+            );
+        }
+
+        private static string[] GetEnabledBlockchainTypes(BlockchainsIntegrationSettings settings)
         {
             return settings.Blockchains
                 .Where(x => x.EnableTransactionsHistory)
-                .ToDictionary
-                (
-                    x => x.Type,
-                    x => (IBlockchainApiClient) new BlockchainApiClient(log, x.ApiUrl)
-                );
+                .Select(x => x.Type)
+                .ToArray();
         }
 
         private async Task DetectNewTransactionsAsync(CancellationToken cancellationToken)
@@ -97,7 +105,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
 
                     IEnumerable<ObservableWalletDto> wallets;
 
-                    (wallets, continuationToken) = await _observableWalletsRepository.GetAllAsync(100, continuationToken);
+                    (wallets, continuationToken) = await _observableWalletsRepository.GetAllAsync(_enabledBlockchainTypes, 100, continuationToken);
 
                     await Task.WhenAll(wallets.Select
                     (
@@ -168,6 +176,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
                         (
                             blockchainType: wallet.BlockchainType,
                             walletAddress: wallet.WalletAddress,
+                            walletAssetId: wallet.WalletAssetId,
                             hash: afterHash
                         );
                     }

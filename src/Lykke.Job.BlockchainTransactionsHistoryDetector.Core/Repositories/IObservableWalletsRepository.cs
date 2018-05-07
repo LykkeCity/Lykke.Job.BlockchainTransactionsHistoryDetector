@@ -7,12 +7,12 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Core.Repositories
 {
     public interface IObservableWalletsRepository
     {
-        Task AddIfNotExistsAsync(string blockchainType, string walletAddress);
+        Task AddIfNotExistsAsync(string blockchainType, string walletAddress, string walletAssedId);
 
-        Task DeleteIfExistsAsync(string blockchainType, string walletAddress);
+        Task DeleteIfExistsAsync(string blockchainType, string walletAddress, string walletAssedId);
         
-        Task<(IEnumerable<ObservableWalletDto> Wallets, string ContinuationToken)> GetAllAsync(int take, string continuationToken = null);
+        Task<(IEnumerable<ObservableWalletDto> Wallets, string ContinuationToken)> GetAllAsync(string[] blockchainTypes, int take, string continuationToken = null);
         
-        Task UpdateLatestProcessedHashAsync(string blockchainType, string walletAddress, string hash);
+        Task UpdateLatestProcessedHashAsync(string blockchainType, string walletAddress, string walletAssetId, string hash);
     }
 }
