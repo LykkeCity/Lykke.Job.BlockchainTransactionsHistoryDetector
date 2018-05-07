@@ -200,7 +200,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector
 
             var persistenceManager = new LykkeLogToAzureStoragePersistenceManager
             (
-                AzureTableStorage<LogEntity>.Create(dbLogConnectionStringManager, "BlockchainCashinDetectorLog", consoleLogger),
+                AzureTableStorage<LogEntity>.Create(dbLogConnectionStringManager, "BlockchainTransactionsHistoryDetectorLog", consoleLogger),
                 consoleLogger
             );
 
