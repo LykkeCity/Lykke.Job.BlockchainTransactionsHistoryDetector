@@ -1,10 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using Common.Log;
+using Lykke.Job.BlockchainTransactionsHistoryDetector.Core.Repositories;
+using Lykke.Service.BlockchainApi.Client;
+using Lykke.SettingsReader;
 using Microsoft.Extensions.CommandLineUtils;
-
+using Microsoft.Extensions.Configuration;
 using TargetRepository = Lykke.Job.BlockchainTransactionsHistoryDetector.AzureRepositories.ObservableWalletsRepository;
 
 
@@ -12,10 +16,12 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.WalletsImporter
 {
     internal static class Program
     {
-        private const string SourceConnectionString = "sourceConnectionString";
-        private const string TargetConnectionString = "targetConnectionString";
+        private const string SourceSettingsUrl = "sourceSettingsUrl";
+        private const string TargetSettingsUrl = "targetSettingsUrl";
+        
+        private static readonly ILog Log = new EmptyLog(); 
 
-
+        
         private static void Main(string[] args)
         {
             var application = new CommandLineApplication
@@ -26,18 +32,18 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.WalletsImporter
             var arguments = new Dictionary<string, CommandArgument>
             {
                 {
-                    SourceConnectionString,
+                    SourceSettingsUrl,
                     application.Argument
                     (
-                        SourceConnectionString,
+                        SourceSettingsUrl,
                         "Data connection string of a BlockchainWallets service."
                     )
                 },
                 {
-                    TargetConnectionString,
+                    TargetSettingsUrl,
                     application.Argument
                     (
-                        TargetConnectionString,
+                        TargetSettingsUrl,
                         "Data connection string of a BlockchainTransactionsHistoryDetector job."
                     )
                 }
@@ -56,8 +62,8 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.WalletsImporter
                     {
                         await RegisterWalletsAsync
                         (
-                            arguments[SourceConnectionString].Value,
-                            arguments[TargetConnectionString].Value
+                            arguments[SourceSettingsUrl].Value,
+                            arguments[TargetSettingsUrl].Value
                         );
                     }
 
@@ -68,6 +74,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.WalletsImporter
                     Console.WriteLine();
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine(e);
+                    Console.ResetColor();
 
                     return 1;
                 }
@@ -76,46 +83,146 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.WalletsImporter
             application.Execute(args);
         }
 
-        private static async Task RegisterWalletsAsync(string sourceConnectionString, string targetConnectionString)
+        private static async Task RegisterWalletsAsync(string sourceSettingsUrl, string targetSettingsUrl)
         {
-            if (string.IsNullOrWhiteSpace(sourceConnectionString))
+            if (string.IsNullOrWhiteSpace(sourceSettingsUrl))
             {
-                Console.WriteLine($"{sourceConnectionString} should be provided");
+                Console.WriteLine($"{sourceSettingsUrl} should be provided");
 
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(targetConnectionString))
+            if (string.IsNullOrWhiteSpace(targetSettingsUrl))
             {
-                Console.WriteLine($"{targetConnectionString} should be provided");
+                Console.WriteLine($"{targetSettingsUrl} should be provided");
 
                 return;
             }
 
-            var log = new LogToConsole();
+            var (sourceSettings, targetSettings) = GetSettings(sourceSettingsUrl, targetSettingsUrl);
+            var (sourceRepository, targetRepository) = GetRepositories(sourceSettings, targetSettings);
+            var clients = await GetClientsAsync(sourceSettings.CurrentValue);
 
-            var sourceRepository = SourceRepository.Create
-            (
-                new SettingsManager(targetConnectionString),
-                log
-            );
+            await ImportWalletsAsync(sourceRepository, targetRepository, clients);
+        }
+
+        private static async Task<IDictionary<string, BlockchainApiClient>> GetClientsAsync(SourceSettings sourceSettings)
+        {
+            Console.WriteLine("Gettting blockchains, that support incoming transactions history");
             
-            var targetRepository = TargetRepository.Create
-            (
-                new SettingsManager(targetConnectionString),
-                log
-            );
+            var clients = new Dictionary<string, BlockchainApiClient>();
 
-            var sourceWallets = await sourceRepository.GetAllAsync();
-
-            foreach (var sourceWallet in sourceWallets)
+            foreach (var blockchain in sourceSettings.BlockchainsIntegration.Blockchains)
             {
+                var client = await GetClientIfTransactionHistoryIsSupportedAsync(blockchain);
+
+                if (client != null)
+                {
+                    clients[blockchain.Type] = client;
+                }
+            }
+
+            return clients;
+        }
+        
+        private static async Task<BlockchainApiClient> GetClientIfTransactionHistoryIsSupportedAsync(BlockchainSettings blockchainSettings)
+        {
+            var client = new BlockchainApiClient(Log, blockchainSettings.ApiUrl);
+            
+            try
+            {
+                await client.StopHistoryObservationOfIncomingTransactionsAsync("fake-address");
+            }
+            catch (Exception e) when (e.InnerException is Refit.ApiException apiException)
+            {
+                // ReSharper disable once SwitchStatementMissingSomeCases
+                switch (apiException.StatusCode)
+                {
+                        case HttpStatusCode.NotFound:
+                        case HttpStatusCode.NotImplemented:
+                            return null;
+                        case HttpStatusCode.BadRequest:
+                            break;
+                        default:
+                            throw;
+                }
+            }
+            
+            return client;
+        }
+
+        private static (SourceRepository, IObservableWalletsRepository) GetRepositories(IReloadingManager<SourceSettings> sourceSettings, IReloadingManager<TargetSettings> targetSettings)
+        {
+            var sourceConnectionString = sourceSettings
+                .Nested(x => x.BlockchainWalletsService.Db.DataConnString);
+            
+            var sourceRepository = SourceRepository.Create(sourceConnectionString, Log);
+            
+            var targetConnectionString = targetSettings
+                .Nested(x => x.BlockchainTransactionsHistoryDetectorJob.Db.DataConnString);
+            
+            var targetRepository = TargetRepository.Create(targetConnectionString, Log);
+
+            return (sourceRepository, targetRepository);
+        }
+        
+        private static (IReloadingManager<SourceSettings>, IReloadingManager<TargetSettings>) GetSettings(string sourceSettingsUrl, string targetSettingsUrl)
+        {
+            Console.WriteLine("Loading source configuration");
+            
+            var configurationBuilder = new ConfigurationBuilder();
+
+            configurationBuilder.AddInMemoryCollection(new Dictionary<string, string>
+            {
+                {"SourceSettingsUrl", sourceSettingsUrl},
+                {"TargetSettingsUrl", targetSettingsUrl}
+            });
+            
+            var configuration = configurationBuilder.Build();
+            
+            var sourceSettings = configuration
+                .LoadSettings<SourceSettings>("SourceSettingsUrl");
+            
+            var targetSettings = configuration
+                .LoadSettings<TargetSettings>("TargetSettingsUrl");
+
+            return (sourceSettings, targetSettings);
+        }
+        
+        private static async Task ImportWalletAsync(IObservableWalletsRepository targetRepository, BlockchainApiClient client, SourceWalletEntity sourceWallet)
+        {
+            try
+            {
+                await client.StartHistoryObservationOfIncomingTransactionsAsync(sourceWallet.Address);
+                    
                 await targetRepository.AddIfNotExistsAsync
                 (
                     blockchainType: sourceWallet.IntegrationLayerId,
                     walletAddress: sourceWallet.Address,
                     walletAssedId: sourceWallet.AssetId
                 );
+                    
+                Console.WriteLine($"Wallet ({sourceWallet.IntegrationLayerId} {sourceWallet.Address}) imported");
+            }
+            catch (Exception e)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Failed to import wallet ({sourceWallet.IntegrationLayerId} {sourceWallet.Address}): {e.Message}");
+                Console.ResetColor();
+            }   
+        }
+        
+        private static async Task ImportWalletsAsync(SourceRepository sourceRepository, IObservableWalletsRepository targetRepository, IDictionary<string, BlockchainApiClient> clients)
+        {
+            Console.WriteLine("Importing wallets");
+
+            var sourceWallets = await sourceRepository.GetAllAsync();
+            
+            foreach (var sourceWallet in sourceWallets.Where(x => clients.ContainsKey(x.IntegrationLayerId)))
+            {
+                var client = clients[sourceWallet.IntegrationLayerId];
+
+                await ImportWalletAsync(targetRepository, client, sourceWallet);
             }
         }
     }

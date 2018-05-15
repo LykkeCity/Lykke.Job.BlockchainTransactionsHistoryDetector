@@ -9,10 +9,6 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Core.Settings.Blockcha
         [HttpCheck("/api/isalive", false)]
         [UsedImplicitly(ImplicitUseKindFlags.Assign)]
         public string ApiUrl { get; set; }
-        
-        [Optional]
-        [UsedImplicitly(ImplicitUseKindFlags.Assign)]
-        public bool EnableTransactionsHistory { get; set; }
 
         [UsedImplicitly(ImplicitUseKindFlags.Assign)]
         public string Type { get; set; }

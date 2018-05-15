@@ -10,11 +10,12 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.WalletsImporter
             CurrentValue = value;
         }
 
-        public async Task<string> Reload()
+        public Task<string> Reload()
         {
-            throw new System.NotImplementedException();
+            return Task.FromResult(CurrentValue);
         }
 
+        
         public bool HasLoaded
             => true;
 

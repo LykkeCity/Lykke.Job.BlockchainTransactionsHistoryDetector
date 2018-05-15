@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Common.Log;
@@ -22,12 +23,12 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
     {
         private readonly OnDemandDataCache<BlockchainAsset> _assetsCache;
         private readonly IDictionary<string, BlockchainApiClient> _blockchainApiClients;
-        private readonly string[] _enabledBlockchainTypes;
         private readonly IObservableWalletsRepository _observableWalletsRepository;
         private readonly ILog _log;
         
         private CancellationTokenSource _cancellationTokenSource;
         private IEventPublisher _eventPublisher;
+        private string[] _supportedBlockchains;
         private Task _task;
 
 
@@ -36,11 +37,14 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
             IObservableWalletsRepository observableWalletsRepository,
             ILog log)
         {
+            // ReSharper disable HeapView.ObjectAllocation.Evident
+            
             _assetsCache = new OnDemandDataCache<BlockchainAsset>();
             _blockchainApiClients = CreateBlockchainApiClients(blockchainsIntegrationSettings, log);
-            _enabledBlockchainTypes = GetEnabledBlockchainTypes(blockchainsIntegrationSettings);
             _observableWalletsRepository = observableWalletsRepository;
             _log = log;
+            
+            // ReSharper enable HeapView.ObjectAllocation.Evident
         }
 
 
@@ -63,17 +67,16 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
             _cancellationTokenSource = new CancellationTokenSource();
             _eventPublisher = eventPublisher;
 
-            var cancellationToken = _cancellationTokenSource.Token;
-
             _task = Task.Run(async () =>
             {
+                var cancellationToken = _cancellationTokenSource.Token;
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     await DetectNewTransactionsAsync(cancellationToken);
                 }
 
-            }, cancellationToken);
+            });
         }
 
         private static IDictionary<string, BlockchainApiClient> CreateBlockchainApiClients(BlockchainsIntegrationSettings settings, ILog log)
@@ -85,18 +88,11 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
             );
         }
 
-        private static string[] GetEnabledBlockchainTypes(BlockchainsIntegrationSettings settings)
-        {
-            return settings.Blockchains
-                .Where(x => x.EnableTransactionsHistory)
-                .Select(x => x.Type)
-                .ToArray();
-        }
-
         private async Task DetectNewTransactionsAsync(CancellationToken cancellationToken)
         {
             try
             {
+                await UpdateSupportedBlockchainsIfNecessaryAsync();
 
                 string continuationToken = null;
 
@@ -105,7 +101,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
 
                     IEnumerable<ObservableWalletDto> wallets;
 
-                    (wallets, continuationToken) = await _observableWalletsRepository.GetAllAsync(_enabledBlockchainTypes, 100, continuationToken);
+                    (wallets, continuationToken) = await _observableWalletsRepository.GetAllAsync(_supportedBlockchains, 100, continuationToken);
 
                     await Task.WhenAll(wallets.Select
                     (
@@ -113,9 +109,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
                     ));
 
                 } while (continuationToken != null && !cancellationToken.IsCancellationRequested);
-
-                await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken);
-
+                
             }
             catch (Exception e)
             {
@@ -128,6 +122,8 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
                     ex: e
                 );
             }
+
+            await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken);
         }
 
         private async Task DetectNewTransactionsForWalletAsync(ObservableWalletDto wallet, CancellationToken cancellationToken)
@@ -204,6 +200,50 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
             );
 
             return asset.Accuracy;
+        }
+
+        private async Task UpdateSupportedBlockchainsIfNecessaryAsync()
+        {
+            if (_supportedBlockchains == null)
+            {
+                var supportedBlockchains = new List<string>();
+
+                foreach (var keyValuePair in _blockchainApiClients)
+                {
+                    var blockchainType = keyValuePair.Key;
+                    var blockchainClient = keyValuePair.Value;
+
+                    try
+                    {
+                        await blockchainClient.StopHistoryObservationOfIncomingTransactionsAsync("fake-address");
+                    }
+                    catch (Exception e) when (e.InnerException is Refit.ApiException apiException)
+                    {
+                        // ReSharper disable once SwitchStatementMissingSomeCases
+                        switch (apiException.StatusCode)
+                        {
+                            case HttpStatusCode.NotFound:
+                            case HttpStatusCode.NotImplemented:
+                                await _log.WriteWarningAsync
+                                (
+                                    component: nameof(NewTransactionDetectionProcess),
+                                    process: nameof(UpdateSupportedBlockchainsIfNecessaryAsync),
+                                    context: null,
+                                    info: $"Blockchain {blockchainType} is not supported. Api responded with {apiException.StatusCode} status code."
+                                );
+                                continue;
+                            case HttpStatusCode.BadRequest:
+                                break;
+                            default:
+                                throw;
+                        }
+                    }
+                    
+                    supportedBlockchains.Add(blockchainType);
+                }
+
+                _supportedBlockchains = supportedBlockchains.ToArray();
+            }
         }
     }
 }

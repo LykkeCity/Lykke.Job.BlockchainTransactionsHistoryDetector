@@ -32,7 +32,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Sagas
             {
                 await _observableWalletsRepository.AddIfNotExistsAsync
                 (
-                    blockchainType: evt.IntegrationLayerId, 
+                    blockchainType: evt.BlockchainType, 
                     walletAddress: evt.Address,
                     walletAssedId: evt.AssetId
                 );
@@ -54,7 +54,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Sagas
             {
                 await _observableWalletsRepository.DeleteIfExistsAsync
                 (
-                    blockchainType: evt.IntegrationLayerId,
+                    blockchainType: evt.BlockchainType,
                     walletAddress: evt.Address,
                     walletAssedId: evt.AssetId
                 );

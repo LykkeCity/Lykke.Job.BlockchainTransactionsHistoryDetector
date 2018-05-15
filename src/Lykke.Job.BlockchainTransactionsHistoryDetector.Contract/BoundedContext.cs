@@ -1,5 +1,8 @@
-﻿namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Contract
+﻿using JetBrains.Annotations;
+
+namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Contract
 {
+    [PublicAPI]
     public class BoundedContext
     {
         public static string Name = "bcn-integration.transactions";

@@ -111,7 +111,9 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Modules
 
                 Register
                     .Saga<WalletOperationsSaga>("wallet-operations-saga")
-                    .ListeningEvents(typeof(WalletCreatedEvent), typeof(WalletDeletedEvent))
+                    .ListeningEvents(
+                        typeof(WalletCreatedEvent),
+                        typeof(WalletDeletedEvent))
                     .From(BlockchainWalletsBoundedContext.Name)
                     .On(BlockchainWalletsBoundedContext.EventsRoute)
             };
