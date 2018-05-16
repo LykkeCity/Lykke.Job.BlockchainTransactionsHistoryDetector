@@ -69,7 +69,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.AzureRepositories
             );
         }
 
-        public async Task<(IEnumerable<ObservableWalletDto> Wallets, string ContinuationToken)> GetAllAsync(string[] blockchainTypes, int take, string continuationToken = null)
+        public async Task<(IEnumerable<ObservableWalletDto> Wallets, string ContinuationToken)> GetAllAsync(ICollection<string> blockchainTypes, int take, string continuationToken = null)
         {
             if (!blockchainTypes.Any())
             {

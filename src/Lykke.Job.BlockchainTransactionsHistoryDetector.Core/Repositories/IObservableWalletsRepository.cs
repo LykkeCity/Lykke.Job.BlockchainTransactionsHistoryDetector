@@ -10,7 +10,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Core.Repositories
 
         Task DeleteIfExistsAsync(string blockchainType, string walletAddress, string walletAssedId);
         
-        Task<(IEnumerable<ObservableWalletDto> Wallets, string ContinuationToken)> GetAllAsync(string[] blockchainTypes, int take, string continuationToken = null);
+        Task<(IEnumerable<ObservableWalletDto> Wallets, string ContinuationToken)> GetAllAsync(ICollection<string> blockchainTypes, int take, string continuationToken = null);
         
         Task UpdateLatestProcessedHashAsync(string blockchainType, string walletAddress, string walletAssetId, string hash);
     }

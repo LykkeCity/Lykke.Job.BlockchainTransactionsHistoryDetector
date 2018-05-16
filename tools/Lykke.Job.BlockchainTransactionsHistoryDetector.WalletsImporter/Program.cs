@@ -140,6 +140,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.WalletsImporter
                 {
                         case HttpStatusCode.NotFound:
                         case HttpStatusCode.NotImplemented:
+                        case HttpStatusCode.InternalServerError:
                             return null;
                         case HttpStatusCode.BadRequest:
                             break;

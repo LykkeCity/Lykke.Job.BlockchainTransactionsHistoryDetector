@@ -22,13 +22,13 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
     public class NewTransactionDetectionProcess : IProcess
     {
         private readonly OnDemandDataCache<BlockchainAsset> _assetsCache;
-        private readonly IDictionary<string, BlockchainApiClient> _blockchainApiClients;
+        private readonly BlockchainsIntegrationSettings _blockchainsIntegrationSettings;
         private readonly IObservableWalletsRepository _observableWalletsRepository;
         private readonly ILog _log;
         
+        private IDictionary<string, BlockchainApiClient> _blockchainApiClients;
         private CancellationTokenSource _cancellationTokenSource;
         private IEventPublisher _eventPublisher;
-        private string[] _supportedBlockchains;
         private Task _task;
 
 
@@ -40,7 +40,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
             // ReSharper disable HeapView.ObjectAllocation.Evident
             
             _assetsCache = new OnDemandDataCache<BlockchainAsset>();
-            _blockchainApiClients = CreateBlockchainApiClients(blockchainsIntegrationSettings, log);
+            _blockchainsIntegrationSettings = blockchainsIntegrationSettings;
             _observableWalletsRepository = observableWalletsRepository;
             _log = log;
             
@@ -71,6 +71,8 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
             {
                 var cancellationToken = _cancellationTokenSource.Token;
 
+                await GetClientsForSupportedBlockchainsAsync();
+                
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     await DetectNewTransactionsAsync(cancellationToken);
@@ -79,21 +81,10 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
             });
         }
 
-        private static IDictionary<string, BlockchainApiClient> CreateBlockchainApiClients(BlockchainsIntegrationSettings settings, ILog log)
-        {
-            return settings.Blockchains.ToDictionary
-            (
-                x => x.Type,
-                x => new BlockchainApiClient(log, x.ApiUrl)
-            );
-        }
-
         private async Task DetectNewTransactionsAsync(CancellationToken cancellationToken)
         {
             try
             {
-                await UpdateSupportedBlockchainsIfNecessaryAsync();
-
                 string continuationToken = null;
 
                 do
@@ -101,7 +92,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
 
                     IEnumerable<ObservableWalletDto> wallets;
 
-                    (wallets, continuationToken) = await _observableWalletsRepository.GetAllAsync(_supportedBlockchains, 100, continuationToken);
+                    (wallets, continuationToken) = await _observableWalletsRepository.GetAllAsync(_blockchainApiClients.Keys, 100, continuationToken);
 
                     await Task.WhenAll(wallets.Select
                     (
@@ -143,7 +134,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
                             afterHash: afterHash,
                             take: 100,
                             assetAccuracyProvider: assetId => GetAssetAccuracy(wallet.BlockchainType, assetId)
-                        )).ToList();
+                        )).Where(x => x.Hash != afterHash).ToList();
 
                         foreach (var transaction in transactions)
                         {
@@ -202,20 +193,26 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
             return asset.Accuracy;
         }
 
-        private async Task UpdateSupportedBlockchainsIfNecessaryAsync()
+        private async Task GetClientsForSupportedBlockchainsAsync()
         {
-            if (_supportedBlockchains == null)
+            if (_blockchainApiClients == null)
             {
-                var supportedBlockchains = new List<string>();
-
-                foreach (var keyValuePair in _blockchainApiClients)
+                var emptyLog = new EmptyLog();
+                var clients = new Dictionary<string, BlockchainApiClient>();
+                
+                foreach (var blockchain in _blockchainsIntegrationSettings.Blockchains)
                 {
-                    var blockchainType = keyValuePair.Key;
-                    var blockchainClient = keyValuePair.Value;
-
+                    var probeClient = new BlockchainApiClient(emptyLog, blockchain.ApiUrl, 1);
+                    
                     try
                     {
-                        await blockchainClient.StopHistoryObservationOfIncomingTransactionsAsync("fake-address");
+                        await probeClient.GetHistoryOfIncomingTransactionsAsync
+                        (
+                            address: "fake-address",
+                            afterHash: null,
+                            take: 2,
+                            assetAccuracyProvider: (x) => 1
+                        );
                     }
                     catch (Exception e) when (e.InnerException is Refit.ApiException apiException)
                     {
@@ -224,12 +221,13 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
                         {
                             case HttpStatusCode.NotFound:
                             case HttpStatusCode.NotImplemented:
+                            case HttpStatusCode.InternalServerError:
                                 await _log.WriteWarningAsync
                                 (
                                     component: nameof(NewTransactionDetectionProcess),
-                                    process: nameof(UpdateSupportedBlockchainsIfNecessaryAsync),
+                                    process: nameof(GetClientsForSupportedBlockchainsAsync),
                                     context: null,
-                                    info: $"Blockchain {blockchainType} is not supported. Api responded with {apiException.StatusCode} status code."
+                                    info: $"Blockchain {blockchain.Type} is not supported. Api responded with {apiException.StatusCode} status code."
                                 );
                                 continue;
                             case HttpStatusCode.BadRequest:
@@ -239,10 +237,10 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Workflow.Processes
                         }
                     }
                     
-                    supportedBlockchains.Add(blockchainType);
+                    clients[blockchain.Type] = new BlockchainApiClient(_log, blockchain.ApiUrl);
                 }
 
-                _supportedBlockchains = supportedBlockchains.ToArray();
+                _blockchainApiClients = clients;
             }
         }
     }
