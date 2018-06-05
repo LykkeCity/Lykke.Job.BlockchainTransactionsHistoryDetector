@@ -1,0 +1,25 @@
+﻿using System.Collections.Generic;
+using JetBrains.Annotations;
+using Lykke.Common.Health;
+using Lykke.Job.BlockchainTransactionsHistoryDetector.Core.Services;
+
+
+namespace Lykke.Job.BlockchainTransactionsHistoryDetector.Services
+{
+    [UsedImplicitly]
+    public class HealthService : IHealthService
+    {
+        public string GetHealthViolationMessage()
+        {
+            return null;
+        }
+
+        public IEnumerable<HealthIssue> GetHealthIssues()
+        {
+            var issues = new HealthIssuesCollection();
+            
+
+            return issues;
+        }
+    }
+}
