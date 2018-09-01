@@ -228,7 +228,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector
             var allMessagesSlackLogger = LykkeLogToSlack.Create
             (
                 slackService,
-                "BlockChainIntegration",
+                "CommonBlockChainIntegration",
                 // ReSharper disable once RedundantArgumentDefaultValue
                 LogLevel.All
             );
@@ -238,7 +238,7 @@ namespace Lykke.Job.BlockchainTransactionsHistoryDetector
             var importantMessagesSlackLogger = LykkeLogToSlack.Create
             (
                 slackService,
-                "BlockChainIntegrationImportantMessages",
+                "CommonBlockChainIntegrationImportantMessages",
                 LogLevel.All ^ LogLevel.Info
             );
 
